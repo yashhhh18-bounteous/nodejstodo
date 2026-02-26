@@ -38,13 +38,7 @@ export const updateTask = async (
     status?: TaskStatus;
   }
 ) => {
-  if (updates.time) {
-    const [h, m] = updates.time.split(":").map(Number);
-    updates = {
-      ...updates,
-      duration: h * 60 + m,
-    };
-  }
+
 
   return await TaskModel.findByIdAndUpdate(id, updates, {
     new: true,
