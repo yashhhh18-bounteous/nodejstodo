@@ -33,11 +33,10 @@ const logError = (label: string, error: unknown) => {
 // ---------- controllers ----------
 
 // GET /tasks
-export const listTasks = async (_req: Request, res: Response): Promise<void> => {
+export const listTasks = async (_req: Request, res: Response) => {
   console.log("➡️ GET /tasks");
   try {
     const tasks = await getTasks();
-    console.log("✅ tasks fetched:", tasks.length);
     res.json(tasks);
   } catch (error) {
     logError("LIST TASKS FAILED", error);
@@ -46,24 +45,17 @@ export const listTasks = async (_req: Request, res: Response): Promise<void> => 
 };
 
 // GET /tasks/status/:status
-export const getTasksByStatusHandler = async (
-  req: Request,
-  res: Response
-): Promise<void> => {
-  console.log("➡️ GET /tasks/status", req.params);
+export const getTasksByStatusHandler = async (req: Request, res: Response) => {
   try {
     const status = req.params.status as TaskStatus;
 
     if (!["todo", "inprogress", "done"].includes(status)) {
-      console.warn("⚠️ Invalid status:", status);
-      res.status(400).json({
+      return res.status(400).json({
         message: 'Status must be "todo", "inprogress", or "done"',
       });
-      return;
     }
 
     const tasks = await getTasksByStatus(status);
-    console.log(`✅ ${tasks.length} tasks with status=${status}`);
     res.json(tasks);
   } catch (error) {
     logError("GET TASKS BY STATUS FAILED", error);
@@ -72,33 +64,21 @@ export const getTasksByStatusHandler = async (
 };
 
 // GET /tasks/:id
-export const getSingleTask = async (
-  req: Request,
-  res: Response
-): Promise<void> => {
-  console.log("➡️ GET /tasks/:id", req.params);
+export const getSingleTask = async (req: Request, res: Response) => {
   try {
-    const parseResult = idParamSchema.safeParse(req.params);
-
-    if (!parseResult.success) {
-      console.warn("⚠️ Invalid ID:", req.params);
-      res.status(400).json({
+    const parsed = idParamSchema.safeParse(req.params);
+    if (!parsed.success) {
+      return res.status(400).json({
         message: "Invalid task ID",
-        errors: formatZodError(parseResult.error),
+        errors: formatZodError(parsed.error),
       });
-      return;
     }
 
-    const { id } = parseResult.data;
-    const task = await getTaskById(id);
-
+    const task = await getTaskById(parsed.data.id);
     if (!task) {
-      console.warn("⚠️ Task not found:", id);
-      res.status(404).json({ message: "Task not found" });
-      return;
+      return res.status(404).json({ message: "Task not found" });
     }
 
-    console.log("✅ Task found:", id);
     res.json(task);
   } catch (error) {
     logError("GET SINGLE TASK FAILED", error);
@@ -107,31 +87,22 @@ export const getSingleTask = async (
 };
 
 // POST /tasks
-export const createSingleTask = async (
-  req: Request,
-  res: Response
-): Promise<void> => {
-  console.log("➡️ POST /tasks", req.body);
+export const createSingleTask = async (req: Request, res: Response) => {
   try {
-    const parseResult = createTaskRequestSchema.safeParse(req.body);
-
-    if (!parseResult.success) {
-      console.warn("⚠️ Create validation failed");
-      res.status(400).json({
+    const parsed = createTaskRequestSchema.safeParse(req.body);
+    if (!parsed.success) {
+      return res.status(400).json({
         message: "Validation failed",
-        errors: formatZodError(parseResult.error),
+        errors: formatZodError(parsed.error),
       });
-      return;
     }
 
-    console.log("⏳ Creating task...");
     const task = await createTask(
-      parseResult.data.title,
-      parseResult.data.description,
-      parseResult.data.time
+      parsed.data.title,
+      parsed.data.description,
+      parsed.data.time
     );
 
-    console.log("✅ Task created with id:", task._id);
     res.status(201).json(task);
   } catch (error) {
     logError("CREATE TASK FAILED", error);
@@ -140,44 +111,22 @@ export const createSingleTask = async (
 };
 
 // PUT /tasks/:id
-export const updateSingleTask = async (
-  req: Request,
-  res: Response
-): Promise<void> => {
-  console.log("➡️ PUT /tasks/:id", req.params, req.body);
+export const updateSingleTask = async (req: Request, res: Response) => {
   try {
-    const idParseResult = idParamSchema.safeParse(req.params);
-    if (!idParseResult.success) {
-      console.warn("⚠️ Invalid ID for update");
-      res.status(400).json({
-        message: "Invalid task ID",
-        errors: formatZodError(idParseResult.error),
-      });
-      return;
-    }
+    const idParsed = idParamSchema.safeParse(req.params);
+    const bodyParsed = updateTaskSchema.safeParse(req.body);
 
-    const updateParseResult = updateTaskSchema.safeParse(req.body);
-    if (!updateParseResult.success) {
-      console.warn("⚠️ Update validation failed");
-      res.status(400).json({
+    if (!idParsed.success || !bodyParsed.success) {
+      return res.status(400).json({
         message: "Validation failed",
-        errors: formatZodError(updateParseResult.error),
       });
-      return;
     }
 
-    const updated = await updateTask(
-      idParseResult.data.id,
-      updateParseResult.data
-    );
-
+    const updated = await updateTask(idParsed.data.id, bodyParsed.data);
     if (!updated) {
-      console.warn("⚠️ Task not found for update");
-      res.status(404).json({ message: "Task not found" });
-      return;
+      return res.status(404).json({ message: "Task not found" });
     }
 
-    console.log("✅ Task updated:", updated._id);
     res.json(updated);
   } catch (error) {
     logError("UPDATE TASK FAILED", error);
@@ -186,43 +135,23 @@ export const updateSingleTask = async (
 };
 
 // PATCH /tasks/:id/status
-export const updateTaskStatus = async (
-  req: Request,
-  res: Response
-): Promise<void> => {
-  console.log("➡️ PATCH /tasks/:id/status", req.params, req.body);
+export const updateTaskStatus = async (req: Request, res: Response) => {
   try {
-    const idParseResult = idParamSchema.safeParse(req.params);
-    if (!idParseResult.success) {
-      console.warn("⚠️ Invalid ID for status update");
-      res.status(400).json({
-        message: "Invalid task ID",
-        errors: formatZodError(idParseResult.error),
-      });
-      return;
+    const idParsed = idParamSchema.safeParse(req.params);
+    const statusParsed = updateTaskStatusSchema.safeParse(req.body);
+
+    if (!idParsed.success || !statusParsed.success) {
+      return res.status(400).json({ message: "Validation failed" });
     }
 
-    const statusParseResult = updateTaskStatusSchema.safeParse(req.body);
-    if (!statusParseResult.success) {
-      console.warn("⚠️ Status validation failed");
-      res.status(400).json({
-        message: "Validation failed",
-        errors: formatZodError(statusParseResult.error),
-      });
-      return;
-    }
-
-    const updated = await updateTask(idParseResult.data.id, {
-      status: statusParseResult.data.status,
+    const updated = await updateTask(idParsed.data.id, {
+      status: statusParsed.data.status,
     });
 
     if (!updated) {
-      console.warn("⚠️ Task not found for status update");
-      res.status(404).json({ message: "Task not found" });
-      return;
+      return res.status(404).json({ message: "Task not found" });
     }
 
-    console.log("✅ Status updated:", updated._id);
     res.json(updated);
   } catch (error) {
     logError("UPDATE STATUS FAILED", error);
@@ -231,30 +160,20 @@ export const updateTaskStatus = async (
 };
 
 // DELETE /tasks/:id
-export const deleteSingleTask = async (
-  req: Request,
-  res: Response
-): Promise<void> => {
-  console.log("➡️ DELETE /tasks/:id", req.params);
+export const deleteSingleTask = async (req: Request, res: Response) => {
   try {
-    const parseResult = idParamSchema.safeParse(req.params);
-    if (!parseResult.success) {
-      console.warn("⚠️ Invalid ID for delete");
-      res.status(400).json({
+    const parsed = idParamSchema.safeParse(req.params);
+    if (!parsed.success) {
+      return res.status(400).json({
         message: "Invalid task ID",
-        errors: formatZodError(parseResult.error),
       });
-      return;
     }
 
-    const deleted = await deleteTaskById(parseResult.data.id);
+    const deleted = await deleteTaskById(parsed.data.id);
     if (!deleted) {
-      console.warn("⚠️ Task not found for delete");
-      res.status(404).json({ message: "Task not found" });
-      return;
+      return res.status(404).json({ message: "Task not found" });
     }
 
-    console.log("✅ Task deleted:", deleted._id);
     res.json(deleted);
   } catch (error) {
     logError("DELETE TASK FAILED", error);

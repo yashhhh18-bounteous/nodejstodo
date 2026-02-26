@@ -38,11 +38,18 @@ export const updateTask = async (
     status?: TaskStatus;
   }
 ) => {
+  const updatedData: any = { ...updates };
 
+  if (updates.time) {
+    const [hours, minutes] = updates.time.split(":").map(Number);
+    updatedData.duration = hours * 60 + minutes;
+  }
 
-  return await TaskModel.findByIdAndUpdate(id, updates, {
-    new: true,
-  });
+  return await TaskModel.findByIdAndUpdate(
+    id,
+    updatedData,
+    { returnDocument: "after" }
+  );
 };
 
 // DELETE task
